@@ -1,0 +1,4 @@
+# Én bogtitel pr. linje. Linjer der starter med # ignoreres.
+# Kopier denne fil til titler.txt og ret til.
+Historien om salt
+Alt det lys vi ikke ser

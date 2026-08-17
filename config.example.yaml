@@ -1,0 +1,23 @@
+# Kopier denne fil til config.yaml.
+#
+# Selve søgeordene bor ikke her, men i to txt-filer du selv redigerer:
+#   titler.txt      - bogtitler du leder efter, én pr. linje
+#   forfattere.txt  - forfatternavne du leder efter, én pr. linje
+# (kopier titler.example.txt / forfattere.example.txt for at komme i gang)
+#
+# Indstillingerne herunder gælder for alle søgninger fra begge filer.
+
+# Hvilket Vinted-marked der søges på.
+domain: "https://www.vinted.dk"
+
+# Filnavne for dine lister (relativt til denne fil). Kan udelades - så
+# bruges titler.txt / forfattere.txt som default.
+titles_file: "titler.txt"
+authors_file: "forfattere.txt"
+
+# (Valgfrit) begræns til en kategori. 2312 = Bøger på Vinted.
+catalog_ids: 2312
+
+# (Valgfrit) pris-loft/-bund i den lokale valuta (DKK for vinted.dk).
+# price_from: 0
+# price_to: 150
