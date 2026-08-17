@@ -1,4 +1,0 @@
-# Én forfatter pr. linje. Linjer der starter med # ignoreres.
-# Kopier denne fil til forfattere.txt og ret til.
-Ken Follett
-Ernest Hemingway

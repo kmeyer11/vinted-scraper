@@ -20,6 +20,7 @@ from typing import List, Optional, Tuple
 
 from .client import VintedClient, VintedItem
 from .config import load_config
+from .lang_filter import looks_danish_or_english
 from .storage import SeenStore
 
 log = logging.getLogger("vinted_watch")
@@ -53,14 +54,16 @@ def run_once(config_path: str, db_path: str, favorite: bool, csv_path: Optional[
     _load_env_file()
     config = load_config(config_path)
     auth_cookie = os.environ.get("VINTED_COOKIE") if favorite else None
+    csrf_token = os.environ.get("VINTED_CSRF_TOKEN") if favorite else None
 
-    if favorite and not auth_cookie:
+    if favorite and not (auth_cookie and csrf_token):
         log.warning(
-            "--favorite is set but VINTED_COOKIE is not configured (see .env.example); "
-            "matches will still be found and logged, but nothing will be favourited."
+            "--favorite is set but VINTED_COOKIE and/or VINTED_CSRF_TOKEN is not "
+            "configured (see .env.example); matches will still be found and "
+            "logged, but nothing will be favourited."
         )
 
-    client = VintedClient(domain=config.domain, auth_cookie=auth_cookie)
+    client = VintedClient(domain=config.domain, auth_cookie=auth_cookie, csrf_token=csrf_token)
     new_matches: List[Tuple[str, VintedItem]] = []
 
     with SeenStore(db_path) as store:
@@ -72,6 +75,8 @@ def run_once(config_path: str, db_path: str, favorite: bool, csv_path: Optional[
                 log.error("Search failed for watch '%s': %s", watch.name, exc)
                 continue
 
+            items = [item for item in items if looks_danish_or_english(item.title)]
+
             for item in items:
                 if not store.is_new(item.id):
                     continue
@@ -82,7 +87,7 @@ def run_once(config_path: str, db_path: str, favorite: bool, csv_path: Optional[
                 price = f"{item.price_amount} {item.price_currency}".strip()
                 print(f"[{watch.name}] {item.title} - {price} - {item.url}")
 
-                if favorite and auth_cookie:
+                if favorite and auth_cookie and csrf_token:
                     ok = client.favourite(item.id)
                     print(f"    -> favourite {'OK' if ok else 'FAILED'}")
 
@@ -108,7 +113,7 @@ def main() -> None:
     parser.add_argument(
         "--favorite",
         action="store_true",
-        help="Best-effort auto-favourite new matches (needs VINTED_COOKIE in .env).",
+        help="Best-effort auto-favourite new matches (needs VINTED_COOKIE and VINTED_CSRF_TOKEN in .env).",
     )
     parser.add_argument("--csv", default=None, help="Optional path to append new matches to as CSV.")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging.")
