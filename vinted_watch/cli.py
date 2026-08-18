@@ -77,6 +77,13 @@ def run_once(config_path: str, db_path: str, favorite: bool, csv_path: Optional[
 
             items = [item for item in items if looks_danish_or_english(item.title)]
 
+            # Vinted's search_text match is loose (fuzzy/partial across
+            # title, description, ...), so it returns plenty of items whose
+            # title has nothing to do with what we searched for. Require the
+            # search text to actually appear in the item's own title.
+            needle = watch.search_text.strip().lower()
+            items = [item for item in items if needle in item.title.lower()]
+
             for item in items:
                 if not store.is_new(item.id):
                     continue

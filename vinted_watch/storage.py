@@ -37,6 +37,13 @@ class SeenStore:
         )
         self._conn.commit()
 
+    def forget(self, item_id: str) -> None:
+        """Un-mark an item as seen, so a future watch run treats it as new
+        again if it turns up in search results (e.g. after deliberately
+        unfavouriting it, in case you want to reconsider it later)."""
+        self._conn.execute("DELETE FROM seen_items WHERE item_id = ?", (item_id,))
+        self._conn.commit()
+
     def close(self) -> None:
         self._conn.close()
 
