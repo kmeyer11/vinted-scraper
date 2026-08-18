@@ -10,6 +10,12 @@ favourited via a search watch) are eligible for removal. Anything else
 you've favourited yourself in the app (clothes, manual favourites, ...)
 is left untouched. Pass --all-favourites to lift that restriction.
 
+Books that get removed here are also forgotten from vinted_watch.db, so
+if one turns up again in a future search-watch run it's treated as new
+again (and can be re-favourited) instead of being silently ignored
+forever - i.e. removing a favourite here means "not right now", not
+"never show me this again".
+
 Usage:
     python -m vinted_watch.clear_favourites                       # just list what's eligible
     python -m vinted_watch.clear_favourites --yes                 # remove all known books
@@ -73,51 +79,53 @@ def main() -> None:
 
     client = VintedClient(domain=args.domain, auth_cookie=auth_cookie, csrf_token=csrf_token)
 
-    def fetch_eligible():
-        favourites = client.list_favourites()
-        if not args.all_favourites:
-            with SeenStore(args.db) as store:
+    with SeenStore(args.db) as store:
+
+        def fetch_eligible():
+            favourites = client.list_favourites()
+            if not args.all_favourites:
                 favourites = [item for item in favourites if not store.is_new(item.id)]
-        if args.contains:
-            needle = args.contains.lower()
-            favourites = [item for item in favourites if needle in item.title.lower()]
-        return favourites
+            if args.contains:
+                needle = args.contains.lower()
+                favourites = [item for item in favourites if needle in item.title.lower()]
+            return favourites
 
-    scope = "ALL favourites" if args.all_favourites else "known books"
-    suffix = " matching filter" if args.contains else ""
+        scope = "ALL favourites" if args.all_favourites else "known books"
+        suffix = " matching filter" if args.contains else ""
 
-    log.info("Fetching your current favourites...")
-    favourites = fetch_eligible()
-    print(f"Found {len(favourites)} eligible favourite(s) ({scope}){suffix}.")
-    for item in favourites:
-        print(f"  {item.title} - {item.url}")
-
-    if not args.yes:
-        print("\nDry run - nothing removed. Re-run with --yes to actually remove these.")
-        return
-
-    # Vinted's favourites-listing endpoint only ever exposes a capped window
-    # of favourites (in practice, around the first ~100). With more
-    # favourites than that, a single list+remove pass would silently leave
-    # the rest behind, so keep re-listing (removed items drop off, exposing
-    # the next batch) until nothing eligible remains.
-    removed = 0
-    while favourites:
-        removed_this_round = 0
-        for item in favourites:
-            ok = client.unfavourite(item.id)
-            print(f"{'Removed' if ok else 'FAILED'}: {item.title}")
-            if ok:
-                removed += 1
-                removed_this_round += 1
-            time.sleep(1.0)  # be polite / avoid rate limiting
-
-        if removed_this_round == 0:
-            break  # nothing removable this round - avoid spinning forever
-
+        log.info("Fetching your current favourites...")
         favourites = fetch_eligible()
+        print(f"Found {len(favourites)} eligible favourite(s) ({scope}){suffix}.")
+        for item in favourites:
+            print(f"  {item.title} - {item.url}")
 
-    print(f"\nDone. Removed {removed}.")
+        if not args.yes:
+            print("\nDry run - nothing removed. Re-run with --yes to actually remove these.")
+            return
+
+        # Vinted's favourites-listing endpoint only ever exposes a capped
+        # window of favourites (in practice, around the first ~100). With
+        # more favourites than that, a single list+remove pass would
+        # silently leave the rest behind, so keep re-listing (removed items
+        # drop off, exposing the next batch) until nothing eligible remains.
+        removed = 0
+        while favourites:
+            removed_this_round = 0
+            for item in favourites:
+                ok = client.unfavourite(item.id)
+                print(f"{'Removed' if ok else 'FAILED'}: {item.title}")
+                if ok:
+                    removed += 1
+                    removed_this_round += 1
+                    store.forget(item.id)
+                time.sleep(1.0)  # be polite / avoid rate limiting
+
+            if removed_this_round == 0:
+                break  # nothing removable this round - avoid spinning forever
+
+            favourites = fetch_eligible()
+
+        print(f"\nDone. Removed {removed}.")
 
 
 if __name__ == "__main__":
